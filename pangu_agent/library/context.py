@@ -1,6 +1,3 @@
-# Copyright (c) 2025 ByteDance Ltd. and/or its affiliates
-# SPDX-License-Identifier: MIT
-
 """Library path helpers and directory traversal."""
 
 from __future__ import annotations
@@ -21,9 +18,8 @@ class LibraryContext:
 
     def resolve_path(self, path: str) -> Path:
         candidate = Path(path)
-        if candidate.is_absolute():
-            raise ValueError(f"Absolute paths are not allowed: {candidate}")
-        candidate = self.root / candidate
+        if not candidate.is_absolute():
+            candidate = self.root / candidate
         candidate = candidate.expanduser().resolve()
         if not self._is_within_root(candidate):
             raise ValueError(f"Path escapes library root: {candidate}")

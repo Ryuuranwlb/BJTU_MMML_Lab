@@ -30,13 +30,17 @@ class ToolCall:
 class ToolResult:
     name: str
     success: bool
-    output: Optional[str] = None
+    output: Any = None
     error: Optional[str] = None
     call_id: Optional[str] = None
 
 
 class Tool(ABC):
     """Base class for synchronous tools."""
+
+    _name: str
+    _description: str
+    _parameters: List[ToolParameter]
 
     def __init__(
         self,
@@ -61,8 +65,8 @@ class Tool(ABC):
         return list(self._parameters)
 
     @abstractmethod
-    def run(self, arguments: ToolCallArguments) -> str:
-        """Execute the tool synchronously and return a string result."""
+    def run(self, arguments: ToolCallArguments) -> Any:
+        """Execute the tool synchronously and return a result."""
 
     def schema(self) -> Dict[str, Any]:
         """OpenAI-compatible tool schema."""
@@ -78,6 +82,8 @@ class Tool(ABC):
 
 class ToolExecutor:
     """Simple tool registry and executor."""
+
+    _tools: Dict[str, Tool]
 
     def __init__(self, tools: Iterable[Tool]) -> None:
         self._tools: Dict[str, Tool] = {tool.name: tool for tool in tools}

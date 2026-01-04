@@ -1,17 +1,16 @@
-# Copyright (c) 2025 ByteDance Ltd. and/or its affiliates
-# SPDX-License-Identifier: MIT
-
 """Library manager with a staging inbox and JSON sidecar metadata."""
 
 from __future__ import annotations
 
+import base64
 import json
 import shutil
 import uuid
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
+from pypdf import PdfReader
 
 from .context import LibraryContext
 
@@ -56,6 +55,7 @@ class LibraryManager:
             raise FileNotFoundError(f"Source file not found: {source}")
 
         # TODO: detect duplicate content by hash before staging.
+        # TODO: generate a description via LLM when staging a new file.
         dest = self._unique_path(self._inbox / source.name)
         shutil.copy2(source, dest)
         metadata = {
@@ -96,6 +96,61 @@ class LibraryManager:
         path = self._context.resolve_path(file_path)
         meta_path = self._metadata_path(path)
         return self._read_metadata(meta_path)
+
+    def list_children(self, path: Path | str) -> List[Path]:
+        if isinstance(path, str):
+            start = self._context.resolve_path(path)
+        else:
+            start = path.expanduser().resolve()
+            try:
+                start.relative_to(self._root)
+            except ValueError as exc:
+                raise ValueError(f"Path escapes library root: {start}") from exc
+        if not start.exists():
+            raise FileNotFoundError(f"Path not found: {start}")
+        if not start.is_dir():
+            raise NotADirectoryError(f"Not a directory: {start}")
+        try:
+            return sorted(start.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+        except OSError as exc:
+            raise OSError(f"Failed to list directory '{start}': {exc}") from exc
+
+    def get_entry(self, path: str) -> Path:
+        entry = self._context.resolve_path(path)
+        if not entry.exists():
+            raise FileNotFoundError(f"Path not found: {entry}")
+        return entry
+
+    def read_file(self, path: str) -> Dict[str, Any]:
+        file_path = self._context.resolve_path(path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        if not file_path.is_file():
+            raise IsADirectoryError(f"Not a file: {file_path}")
+
+        meta_path = self._metadata_path(file_path)
+        meta_data = self._read_metadata(meta_path)
+
+        file_type = self._detect_file_type(file_path)
+        if file_type == "pdf":
+            text = self._read_pdf(file_path)
+            return {
+                "kind": "text",
+                "text": text,
+                "path": path,
+                "meta_data": meta_data,
+            }
+        elif file_type == "image":
+            data = file_path.read_bytes()
+            data_url = f"data:image/{file_path.suffix[1:]};base64,{base64.b64encode(data).decode('ascii')}"
+            return {
+                "kind": "image",
+                "image_url": {"url": data_url},
+                "path": path,
+                "meta_data": meta_data,
+            }
+        else:
+            raise ValueError("Only image or PDF files are supported")
 
     def update_metadata(
         self, file_path: str, updates: Dict[str, Any]
@@ -138,6 +193,7 @@ class LibraryManager:
                 current.rmdir()
                 current = current.parent
 
+
     def _unique_path(self, path: Path) -> Path:
         if not path.exists():
             return path
@@ -155,3 +211,28 @@ class LibraryManager:
             return True
         except ValueError:
             return False
+
+    def _detect_file_type(self, path: Path) -> Optional[str]:
+        suffix = path.suffix.lower()
+        if suffix == ".pdf":
+            return "pdf"
+        image_types = [".jpg", ".jpeg", ".png"]
+        if suffix in image_types:
+            return "image"
+        return None
+
+    def _read_pdf(self, path: Path) -> str:
+        try:
+            reader = PdfReader(str(path))
+        except Exception as exc:
+            raise RuntimeError(f"Failed to read PDF: {path}") from exc
+
+        chunks: list[str] = []
+        for page in reader.pages:
+            try:
+                text = page.extract_text() or ""
+            except Exception:
+                text = ""
+            if text:
+                chunks.append(text)
+        return "\n".join(chunks).strip()
