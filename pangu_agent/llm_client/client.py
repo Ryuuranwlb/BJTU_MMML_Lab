@@ -80,25 +80,23 @@ class LLMClient:
 
     def completion(
         self,
-        memory: Optional[Memory] = None,
-        messages: Optional[List[Dict[str, Any]]] = None,
+        payload: Union[Memory, List[Dict[str, Any]]],
         tools: Optional[List[ChatCompletionToolParam]] = None,
         max_retries: int = 8,
         retry_delay: float = 20.0,
         raw: bool = False,
+        **kwargs: Any,
     ) -> Optional[Union[str, ChatCompletion]]:
-        """Call the model based on memory.history with retry."""
+        """Call the model with Memory or raw messages and retry."""
 
-        messages = memory.history if memory is not None else messages
-        if messages is None:
-            raise ValueError("Either memory or messages must be provided")
+        messages = self._resolve_messages(payload)
 
         retries = 0
         start = time.time()
 
         while retries < max_retries:
             try:
-                result = self._call_azure(messages, tools, raw=raw)
+                result = self._call_azure(messages, tools, raw=raw, **kwargs)
 
                 duration = round(time.time() - start, 2)
                 if self.config.log:
@@ -144,21 +142,30 @@ class LLMClient:
         messages: List[Dict[str, Any]],
         tools: Optional[List[ChatCompletionToolParam]] = None,
         raw: bool = False,
+        **kwargs: Any,
     ) -> Optional[Union[str, ChatCompletion]]:
         if self.azure_client is None:
             raise RuntimeError("AzureOpenAI client not initialized")
 
         try:
-            completion = self.azure_client.chat.completions.create(
-                messages=messages,
-                model=self.deployment_name,
-                tools=tools,
-                max_completion_tokens=self.config.max_tokens,
-                # temperature=self.config.temperature,
-                top_p=self.config.top_p,
-                stream=self.config.stream,
-                stop=self.config.stop,
-            )
+            reserved = {"messages", "model", "tools"}
+            conflicts = reserved.intersection(kwargs)
+            if conflicts:
+                raise ValueError(f"Reserved completion args passed: {sorted(conflicts)}")
+
+            request = {
+                "messages": messages,
+                "model": self.deployment_name,
+                "tools": tools,
+                "max_completion_tokens": self.config.max_tokens,
+                # "temperature": self.config.temperature,
+                "top_p": self.config.top_p,
+                "stream": self.config.stream,
+                "stop": self.config.stop,
+            }
+            request.update(kwargs)
+
+            completion = self.azure_client.chat.completions.create(**request)
 
             if tools or raw:
                 return completion
@@ -179,3 +186,10 @@ class LLMClient:
 
     def __repr__(self):
         return f"<LLMClient deployment='{self.deployment_name}'>"
+
+    def _resolve_messages(self, payload: Union[Memory, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+        if isinstance(payload, Memory):
+            return payload.history
+        if isinstance(payload, list):
+            return payload
+        raise TypeError("payload must be a Memory instance or a list of messages")

@@ -16,7 +16,7 @@ def test_llm_client():
 
     prompt = "Explain the theory of relativity in simple terms."
 
-    response = client.completion(memory=Memory([{"role": "user", "content": prompt}]))
+    response = client.completion(Memory([{"role": "user", "content": prompt}]))
     print(response)
 
 
