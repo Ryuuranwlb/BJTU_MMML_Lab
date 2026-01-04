@@ -1,2 +1,5 @@
 .vscode/
+.venv/
 pangu_agent/llm_client/configs/
+__pycache__/
+*.egg-info/
