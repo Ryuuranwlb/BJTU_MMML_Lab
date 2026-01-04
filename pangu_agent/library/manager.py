@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -13,6 +14,8 @@ from typing import Any, Dict, List, Optional
 from pypdf import PdfReader
 
 from .context import LibraryContext
+
+logger = logging.getLogger(__name__)
 
 
 def _utc_now() -> str:
@@ -33,12 +36,24 @@ class LibraryManager:
     _context: LibraryContext
     _root: Path
     _inbox: Path
+    _llm_client: Any
 
-    def __init__(self, root_path: str, inbox_name: str = ".inbox") -> None:
+    def __init__(
+        self,
+        root_path: str,
+        inbox_name: str = ".inbox",
+        llm_client: Optional[Any] = None
+    ) -> None:
         self._context = LibraryContext.from_root(root_path)
         self._root = self._context.root
         self._inbox = self._root / inbox_name
         self._inbox.mkdir(parents=True, exist_ok=True)
+
+        if llm_client is None:
+            from pangu_agent.llm_client import LLMClient
+            self._llm_client = LLMClient()
+        else:
+            self._llm_client = llm_client
 
     @property
     def root(self) -> Path:
@@ -49,13 +64,19 @@ class LibraryManager:
         return self._inbox
 
     def stage_copy(self, source_path: str) -> Path:
-        """Copy an external file into the inbox and create metadata."""
+        """Copy an external file into the inbox and create metadata.
+
+        Args:
+            source_path: Path to the source file to stage
+
+        Returns:
+            Path to the staged file in the inbox
+        """
         source = Path(source_path).expanduser().resolve()
         if not source.is_file():
             raise FileNotFoundError(f"Source file not found: {source}")
 
         # TODO: detect duplicate content by hash before staging.
-        # TODO: generate a description via LLM when staging a new file.
         dest = self._unique_path(self._inbox / source.name)
         shutil.copy2(source, dest)
         metadata = {
@@ -65,6 +86,16 @@ class LibraryManager:
             "added_at": _utc_now(),
             "updated_at": _utc_now(),
         }
+
+        # Generate description via LLM
+        try:
+            description = self._generate_description(dest)
+            if description:
+                metadata["description"] = description
+                logger.info(f"Generated description for {dest.name}")
+        except Exception as exc:
+            logger.warning(f"Failed to generate description for {dest.name}: {exc}")
+
         self._write_metadata(dest, metadata)
         return dest
 
@@ -237,3 +268,68 @@ class LibraryManager:
             if text:
                 chunks.append(text)
         return "\n".join(chunks).strip()
+
+    def _generate_description(self, file_path: Path) -> Optional[str]:
+        """Generate a description for a file using LLM.
+
+        Args:
+            file_path: Path to the file (must be within library root)
+
+        Returns:
+            Generated description string, or None if generation fails
+        """
+        from pangu_agent.llm_client import Memory
+
+        try:
+            # Get relative path for read_file
+            relative_path = file_path.relative_to(self._root)
+
+            # Read file content using existing read_file method
+            file_data = self.read_file(str(relative_path), include_content=True, include_meta=False)
+
+            # Build LLM prompt based on file type
+            memory = Memory()
+            memory.add(
+                "system",
+                "You are a helpful assistant that generates concise descriptions for academic literature files. "
+                "Provide a brief summary (2-3 sentences) highlighting the main topic, key findings, or content focus."
+            )
+
+            kind = file_data.get("kind")
+            if kind == "text":
+                # PDF content
+                text = file_data.get("text", "")
+                if not text:
+                    logger.warning(f"Empty text content: {file_path}")
+                    return None
+                # Limit content length for LLM
+                content_preview = text[:4000] if len(text) > 4000 else text
+                memory.add("user", f"Please describe this PDF file:\n\n{content_preview}")
+            elif kind == "image":
+                # Image content (already in data URL format)
+                image_url = file_data.get("image_url")
+                if not image_url:
+                    logger.warning(f"No image URL found: {file_path}")
+                    return None
+                memory.add_raw({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Please describe this image briefly."},
+                        {"type": "image_url", "image_url": image_url}
+                    ]
+                })
+            else:
+                logger.warning(f"Unsupported file kind: {kind}")
+                return None
+
+            # Call LLM
+            response = self._llm_client.completion(memory)
+            if response:
+                return response.strip()
+            else:
+                logger.warning(f"LLM returned empty response for {file_path}")
+                return None
+
+        except Exception as exc:
+            logger.exception(f"Error generating description for {file_path}: {exc}")
+            return None
