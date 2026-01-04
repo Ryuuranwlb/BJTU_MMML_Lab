@@ -11,3 +11,10 @@ dependencies = [
     "pypdf>=4.2.0",
     "pyyaml>=6.0.3",
 ]
+
+[project.scripts]
+pangu = "pangu_agent.cli:main"
+
+[tool.uv]
+package = true
+

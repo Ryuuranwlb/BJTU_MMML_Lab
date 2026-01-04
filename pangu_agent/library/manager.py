@@ -121,36 +121,37 @@ class LibraryManager:
             raise FileNotFoundError(f"Path not found: {entry}")
         return entry
 
-    def read_file(self, path: str) -> Dict[str, Any]:
+    def read_file(self, path: str, include_content: bool = True, include_meta: bool = True) -> Dict[str, Any]:
         file_path = self._context.resolve_path(path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         if not file_path.is_file():
             raise IsADirectoryError(f"Not a file: {file_path}")
 
-        meta_path = self._metadata_path(file_path)
-        meta_data = self._read_metadata(meta_path)
+        result: Dict[str, Any] = {"path": path}
 
-        file_type = self._detect_file_type(file_path)
-        if file_type == "pdf":
-            text = self._read_pdf(file_path)
-            return {
-                "kind": "text",
-                "text": text,
-                "path": path,
-                "meta_data": meta_data,
-            }
-        elif file_type == "image":
-            data = file_path.read_bytes()
-            data_url = f"data:image/{file_path.suffix[1:]};base64,{base64.b64encode(data).decode('ascii')}"
-            return {
-                "kind": "image",
-                "image_url": {"url": data_url},
-                "path": path,
-                "meta_data": meta_data,
-            }
-        else:
-            raise ValueError("Only image or PDF files are supported")
+        # Read metadata if requested
+        if include_meta:
+            meta_path = self._metadata_path(file_path)
+            meta_data = self._read_metadata(meta_path)
+            result["meta_data"] = meta_data
+
+        # Read content if requested
+        if include_content:
+            file_type = self._detect_file_type(file_path)
+            if file_type == "pdf":
+                text = self._read_pdf(file_path)
+                result["kind"] = "text"
+                result["text"] = text
+            elif file_type == "image":
+                data = file_path.read_bytes()
+                data_url = f"data:image/{file_path.suffix[1:]};base64,{base64.b64encode(data).decode('ascii')}"
+                result["kind"] = "image"
+                result["image_url"] = {"url": data_url}
+            else:
+                raise ValueError("Only image or PDF files are supported")
+
+        return result
 
     def update_metadata(
         self, file_path: str, updates: Dict[str, Any]
