@@ -37,6 +37,8 @@ class LibraryManager:
     _root: Path
     _inbox: Path
     _llm_client: Any
+    _encoder: Any
+    _vector_store: Any
 
     def __init__(
         self,
@@ -54,6 +56,16 @@ class LibraryManager:
             self._llm_client = LLMClient()
         else:
             self._llm_client = llm_client
+
+        # Initialize embedding system
+        logger.info("Initializing embedding system...")
+        from pangu_agent.library.embeddings import OpenCLIPEncoder, VectorStore
+
+        self._encoder = OpenCLIPEncoder()
+        self._vector_store = VectorStore(
+            storage_path=self._root / ".vector_store"
+        )
+        logger.info("Embedding system ready")
 
     @property
     def root(self) -> Path:
@@ -75,7 +87,7 @@ class LibraryManager:
         shutil.copy2(source, dest)
         metadata = {
             "id": str(uuid.uuid4()),
-            "path": str(dest),
+            "path": str(dest.relative_to(self._root)),
             "hash": _hash_file(dest),
             "added_at": _utc_now(),
             "updated_at": _utc_now(),
@@ -92,6 +104,20 @@ class LibraryManager:
             logger.warning(f"Failed to generate description for {dest.name}: {exc}")
 
         self._write_metadata(dest, metadata)
+
+        # Generate and store embedding
+        try:
+            relative_path = dest.relative_to(self._root)
+            embedding = self._encoder.encode_file(dest)
+            self._vector_store.add(
+                file_id=metadata["id"],
+                embedding=embedding,
+                metadata={"path": str(relative_path)}
+            )
+            logger.info(f"Generated embedding for {dest.name}")
+        except Exception as exc:
+            logger.warning(f"Failed to generate embedding for {dest.name}: {exc}")
+
         return dest
 
     def move_file(self, source_path: str, dest_path: str) -> Path:
@@ -112,9 +138,23 @@ class LibraryManager:
         if source_meta.exists():
             source_meta.rename(dest_meta)
             metadata = self._read_metadata(dest_meta)
-            metadata["path"] = str(dest)
+            metadata["path"] = str(dest.relative_to(self._root))
             metadata["updated_at"] = _utc_now()
             self._write_metadata(dest, metadata)
+
+            # Update vector store path
+            try:
+                file_id = metadata.get("id")
+                if file_id:
+                    relative_path = dest.relative_to(self._root)
+                    self._vector_store.update_metadata(
+                        file_id=file_id,
+                        metadata={"path": str(relative_path)}
+                    )
+                    logger.debug(f"Updated vector store path for {file_id}")
+            except Exception as exc:
+                logger.warning(f"Failed to update vector store: {exc}")
+
         self._cleanup_empty_dirs(source.parent)
         return dest
 
@@ -192,7 +232,7 @@ class LibraryManager:
         meta_path = self._metadata_path(path)
         metadata = self._read_metadata(meta_path)
         metadata.update(updates)
-        metadata["path"] = str(path)
+        metadata["path"] = str(path.relative_to(self._root))
         metadata["updated_at"] = _utc_now()
         self._write_metadata(path, metadata)
         return metadata
@@ -321,3 +361,43 @@ class LibraryManager:
         except Exception as exc:
             logger.exception(f"Error generating description for {file_path}: {exc}")
             return None
+
+    def search_library(
+        self, query: str, top_k: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Search library files by semantic similarity.
+
+        Args:
+            query: Natural language query
+            top_k: Number of results to return
+
+        Returns:
+            List of search results with path, score, and metadata
+        """
+        # Encode query
+        query_embedding = self._encoder.encode_text(query)
+
+        # Search vector store
+        results = self._vector_store.search(query_embedding, top_k=top_k)
+
+        # Format results
+        formatted_results = []
+        for result in results:
+            relative_path = result.metadata["path"]
+            abs_path = self._root / relative_path
+
+            # Try to read metadata from .meta.json
+            try:
+                meta_path = self._metadata_path(abs_path)
+                file_metadata = self._read_metadata(meta_path)
+            except Exception:
+                file_metadata = {}
+
+            formatted_results.append({
+                "path": relative_path,
+                "score": result.score,
+                "description": file_metadata.get("description", ""),
+                "metadata": file_metadata,
+            })
+
+        return formatted_results
