@@ -9,8 +9,10 @@ import click
 from pangu_agent.library.manager import LibraryManager
 from pangu_agent.llm_client.client import LLMClient
 from pangu_agent.services.add_literature import AddLiteratureService
+from pangu_agent.services.search_files import SearchFilesService
 from pangu_agent.tools import (
     ExploreLibraryTool,
+    FinishTool,
     MoveFileTool,
     SearchLibraryTool,
     ViewFileTool,
@@ -77,6 +79,25 @@ def run(
     if action == "search":
         if not query:
             raise click.UsageError("--query is required for search.")
+
+        # Initialize components
+        manager = LibraryManager(library_root)
+        llm_client = LLMClient()
+
+        # Setup tools (no MoveFileTool for search)
+        tools = [
+            SearchLibraryTool(manager),
+            ViewFileTool(manager),
+            ExploreLibraryTool(manager),
+            FinishTool(),
+        ]
+
+        # Create service and execute search
+        service = SearchFilesService(manager, llm_client, tools)
+        result = service.search(query)
+
+        # Print results
+        _print_search_results(result)
         return
 
 
@@ -119,6 +140,30 @@ def _print_add_results(results: list[dict[str, Any]]):
         else:
             error = result.get("error", "unknown error")
             click.echo(f"  ✗ {source}: {error}")
+
+
+def _print_search_results(result: dict[str, Any]):
+    """Print results from search operation."""
+    if not result.get("success"):
+        error = result.get("error", "Unknown error")
+        click.echo(f"\n✗ Search failed: {error}")
+        return
+
+    files = result.get("files", [])
+    observation = result.get("observation", "")
+    iterations = result.get("iterations", "N/A")
+
+    click.echo(f"\n✓ Search completed in {iterations} iteration(s)\n")
+
+    if files:
+        click.echo(f"Found {len(files)} relevant file(s):\n")
+        for i, file_path in enumerate(files, 1):
+            click.echo(f"  {i}. {file_path}")
+    else:
+        click.echo("No files found.")
+
+    if observation:
+        click.echo(f"\nObservation:\n  {observation}")
 
 
 
