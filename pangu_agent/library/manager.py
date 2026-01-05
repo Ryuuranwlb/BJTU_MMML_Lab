@@ -109,10 +109,16 @@ class LibraryManager:
         try:
             relative_path = dest.relative_to(self._root)
             embedding = self._encoder.encode_file(dest)
+
+            # Determine file type from extension
+            file_type = self._detect_file_type(dest)
             self._vector_store.add(
                 file_id=metadata["id"],
                 embedding=embedding,
-                metadata={"path": str(relative_path)}
+                metadata={
+                    "path": str(relative_path),
+                    "file_type": file_type
+                }
             )
             logger.info(f"Generated embedding for {dest.name}")
         except Exception as exc:
@@ -363,41 +369,51 @@ class LibraryManager:
             return None
 
     def search_library(
-        self, query: str, top_k: int = 5
+        self, query: str, top_k: int = 5, file_types: List[str] = ["pdf", "image"]
     ) -> List[Dict[str, Any]]:
         """Search library files by semantic similarity.
 
         Args:
-            query: Natural language query
-            top_k: Number of results to return
+            query: Natural language search query
+            top_k: Total number of results to return across all file types
+            file_types: List of file types to search (e.g., ["pdf", "image"])
 
         Returns:
-            List of search results with path, score, and metadata
+            List of search results, each containing path, score, description, metadata, and file_type.
+            Results are sorted by similarity score in descending order.
         """
-        # Encode query
         query_embedding = self._encoder.encode_text(query)
 
-        # Search vector store
-        results = self._vector_store.search(query_embedding, top_k=top_k)
+        # Use ChromaDB's where clause to filter by file_type
+        where_filter = {"file_type": {"$in": file_types}}
 
-        # Format results
-        formatted_results = []
-        for result in results:
-            relative_path = result.metadata["path"]
-            abs_path = self._root / relative_path
+        # Search with filter
+        raw_results = self._vector_store.search(
+            query_embedding,
+            top_k=top_k,
+            where=where_filter
+        )
+
+        # Build final results with metadata
+        results = []
+        for result in raw_results:
+            path = result.metadata["path"]
+            file_type = result.metadata.get("file_type")
+            file_path = self._context.resolve_path(path)
 
             # Try to read metadata from .meta.json
             try:
-                meta_path = self._metadata_path(abs_path)
+                meta_path = self._metadata_path(file_path)
                 file_metadata = self._read_metadata(meta_path)
             except Exception:
                 file_metadata = {}
 
-            formatted_results.append({
-                "path": relative_path,
+            results.append({
+                "path": path,
                 "score": result.score,
                 "description": file_metadata.get("description", ""),
                 "metadata": file_metadata,
+                "file_type": file_type,
             })
 
-        return formatted_results
+        return results

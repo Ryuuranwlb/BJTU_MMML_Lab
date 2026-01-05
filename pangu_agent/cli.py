@@ -11,6 +11,7 @@ from pangu_agent.llm_client.client import LLMClient
 from pangu_agent.services.add_literature import AddLiteratureService
 from pangu_agent.tools.explore_library import ExploreLibraryTool
 from pangu_agent.tools.move_file import MoveFileTool
+from pangu_agent.tools.search_library import SearchLibraryTool
 from pangu_agent.tools.view_file import ViewFileTool
 
 

@@ -10,6 +10,7 @@ from pangu_agent.library.manager import LibraryManager
 from pangu_agent.tools.base import ToolExecutor
 from pangu_agent.tools.explore_library import ExploreLibraryTool
 from pangu_agent.tools.move_file import MoveFileTool
+from pangu_agent.tools.search_library import SearchLibraryTool
 from pangu_agent.tools.view_file import ViewFileTool
 
 logging.basicConfig(
@@ -175,13 +176,86 @@ def test_view_file_tool():
     print_result(result)
 
 
+def test_search_library_tool():
+    """Test SearchLibraryTool - semantic search using embeddings."""
+    print("\n" + "=" * 60)
+    print("TEST: SearchLibraryTool")
+    print("=" * 60)
+
+    # Initialize manager (this will also initialize embedding system)
+    print("\nInitializing embedding system...")
+    manager = LibraryManager(str(TEST_LIBRARY_ROOT))
+    tools = [SearchLibraryTool(manager)]
+    executor = ToolExecutor(tools)
+
+    # First, stage some files to build the index
+    print("\n[Setup] Staging files to build vector index...")
+
+    # Stage the transformer PDF if it exists
+    transformer_pdf = TEST_LIBRARY_ROOT / "papers" / "AI" / "transformer.pdf"
+    if transformer_pdf.exists():
+        try:
+            staged = manager.stage_copy(str(transformer_pdf))
+            print(f"  ✓ Staged: {staged.name}")
+        except Exception as e:
+            print(f"  ✗ Failed to stage transformer.pdf: {e}")
+
+    # Stage the image if it exists
+    sample_img = TEST_LIBRARY_ROOT / "papers" / "AI" / "sample_image.png"
+    if sample_img.exists():
+        try:
+            staged = manager.stage_copy(str(sample_img))
+            print(f"  ✓ Staged: {staged.name}")
+        except Exception as e:
+            print(f"  ✗ Failed to stage sample_image.png: {e}")
+
+    # Check vector store count
+    count = manager._vector_store.count()
+    print(f"\n  Vector store now contains {count} embedding(s)")
+
+    if count == 0:
+        print("\n  ⚠ No embeddings in store, search tests will return empty results")
+
+    # Test 1: Search with default (both types, grouped)
+    print("\n[1] Search for 'transformer attention' (both types, top_k=2):")
+    result = executor.execute("search_library", {
+        "query": "transformer attention mechanism",
+        "top_k": 2
+    })
+    print_result(result)
+
+    # Test 2: Search only PDFs
+    print("\n[2] Search for 'neural network' (only PDFs):")
+    result = executor.execute("search_library", {
+        "query": "neural network",
+        "top_k": 2,
+        "file_types": ["pdf"]
+    })
+    print_result(result)
+
+    # Test 3: Search only images
+    print("\n[3] Search for 'pytorch logo' (only images):")
+    result = executor.execute("search_library", {
+        "query": "pytorch logo",
+        "top_k": 2,
+        "file_types": ["image"]
+    })
+    print_result(result)
+
+    # Test 4: Empty query should fail
+    print("\n[4] Search with empty query (should fail):")
+    result = executor.execute("search_library", {"query": ""})
+    print_result(result)
+
+
+
 def main():
     parser = argparse.ArgumentParser(description="Test tools with configurable selection")
     parser.add_argument(
         "--tools",
         nargs="+",
-        choices=["explore", "move", "view"],
-        default=["explore", "move", "view"],
+        choices=["explore", "move", "view", "search"],
+        default=["explore", "move", "view", "search"],
         help="Select which tools to test (default: all)",
     )
     args = parser.parse_args()
@@ -198,6 +272,9 @@ def main():
 
     if "view" in args.tools:
         test_view_file_tool()
+
+    if "search" in args.tools:
+        test_search_library_tool()
 
     print("\n" + "=" * 60)
     print("All tests completed!")
