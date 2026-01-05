@@ -8,6 +8,7 @@ from pangu_agent.tools.base import (
     ToolParameter,
     ToolResult,
 )
+from pangu_agent.tools.add_literature import AddLiteratureTool
 from pangu_agent.tools.explore_library import ExploreLibraryTool
 from pangu_agent.tools.finish import FinishTool
 from pangu_agent.tools.move_file import MoveFileTool
@@ -23,6 +24,7 @@ __all__ = [
     "ToolParameter",
     "ToolResult",
     # Concrete tools
+    "AddLiteratureTool",
     "ExploreLibraryTool",
     "FinishTool",
     "MoveFileTool",
