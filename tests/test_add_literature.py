@@ -9,9 +9,12 @@ from urllib.request import urlretrieve
 from pangu_agent.library.manager import LibraryManager
 from pangu_agent.llm_client.client import LLMClient
 from pangu_agent.services.add_literature import AddLiteratureService
-from pangu_agent.tools.explore_library import ExploreLibraryTool
-from pangu_agent.tools.move_file import MoveFileTool
-from pangu_agent.tools.view_file import ViewFileTool
+from pangu_agent.tools import (
+    ExploreLibraryTool,
+    ViewFileTool,
+    MoveFileTool,
+    SearchLibraryTool,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -191,6 +194,7 @@ def test_add_directory():
         ExploreLibraryTool(manager),
         ViewFileTool(manager),
         MoveFileTool(manager),
+        SearchLibraryTool(manager),
     ]
 
     service = AddLiteratureService(manager, llm_client, tools)
@@ -283,7 +287,7 @@ def main():
         if (TEST_LIBRARY_ROOT / ".inbox").exists():
             shutil.rmtree(TEST_LIBRARY_ROOT / ".inbox")
         (TEST_LIBRARY_ROOT / ".inbox").mkdir()
-        # test_add_single_file()
+        test_add_single_file()
 
     if "directory" in tests_to_run:
         # Reset library for directory test

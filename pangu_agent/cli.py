@@ -9,10 +9,12 @@ import click
 from pangu_agent.library.manager import LibraryManager
 from pangu_agent.llm_client.client import LLMClient
 from pangu_agent.services.add_literature import AddLiteratureService
-from pangu_agent.tools.explore_library import ExploreLibraryTool
-from pangu_agent.tools.move_file import MoveFileTool
-from pangu_agent.tools.search_library import SearchLibraryTool
-from pangu_agent.tools.view_file import ViewFileTool
+from pangu_agent.tools import (
+    ExploreLibraryTool,
+    MoveFileTool,
+    SearchLibraryTool,
+    ViewFileTool,
+)
 
 
 @click.group()
@@ -61,6 +63,7 @@ def run(
             ExploreLibraryTool(manager),
             ViewFileTool(manager),
             MoveFileTool(manager),
+            SearchLibraryTool(manager),
         ]
 
         # Create service and execute add

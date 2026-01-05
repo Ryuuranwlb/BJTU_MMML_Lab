@@ -6,16 +6,21 @@ import shutil
 from pathlib import Path
 from urllib.request import urlretrieve
 
-from pangu_agent.agent import Agent
+from pangu_agent.agent import Agent, finish_tool_stop_condition
 from pangu_agent.library.manager import LibraryManager
 from pangu_agent.llm_client.client import LLMClient
 from pangu_agent.prompts import (
     LITERATURE_ORGANIZER_SYSTEM_PROMPT,
     build_file_organization_prompt,
 )
-from pangu_agent.tools.explore_library import ExploreLibraryTool
-from pangu_agent.tools.move_file import MoveFileTool
-from pangu_agent.tools.view_file import ViewFileTool
+from pangu_agent.tools import (
+    ExploreLibraryTool,
+    FinishTool,
+    MoveFileTool,
+    ToolCall,
+    ToolResult,
+    ViewFileTool,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -106,8 +111,8 @@ def test_agent_organize_file():
     agent.add_system_prompt(LITERATURE_ORGANIZER_SYSTEM_PROMPT)
     agent.add_user_message(build_file_organization_prompt(inbox_path, file_content))
 
-    def stop_when_file_moved(context):
-        return context["tool_name"] == "move_file" and context["result"].success
+    def stop_when_file_moved(tool_call: ToolCall, tool_result: ToolResult) -> bool:
+        return tool_call.name == "move_file" and tool_result.success
 
     print("\n[Running agent with stop condition...]")
     result = agent.run(stop_condition=stop_when_file_moved)

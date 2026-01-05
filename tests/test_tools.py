@@ -7,11 +7,14 @@ from pathlib import Path
 from urllib.request import urlretrieve
 
 from pangu_agent.library.manager import LibraryManager
-from pangu_agent.tools.base import ToolExecutor
-from pangu_agent.tools.explore_library import ExploreLibraryTool
-from pangu_agent.tools.move_file import MoveFileTool
-from pangu_agent.tools.search_library import SearchLibraryTool
-from pangu_agent.tools.view_file import ViewFileTool
+from pangu_agent.tools import (
+    ExploreLibraryTool,
+    FinishTool,
+    MoveFileTool,
+    SearchLibraryTool,
+    ToolExecutor,
+    ViewFileTool,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -248,14 +251,73 @@ def test_search_library_tool():
     print_result(result)
 
 
+def test_finish_tool():
+    """Test FinishTool - terminate with result."""
+    print("\n" + "=" * 60)
+    print("TEST: FinishTool")
+    print("=" * 60)
+
+    tools = [FinishTool()]
+    executor = ToolExecutor(tools)
+
+    # Test 1: Finish with success status
+    print("\n[1] Finish with success status:")
+    result = executor.execute("finish", {
+        "result": "Task completed successfully! Found 5 relevant papers.",
+        "status": "success"
+    })
+    print_result(result)
+    if result.success and isinstance(result.output, dict):
+        print(f"  Finished: {result.output.get('finished')}")
+        print(f"  Status: {result.output.get('status')}")
+        print(f"  Result: {result.output.get('result')}")
+
+    # Test 2: Finish with default status (success)
+    print("\n[2] Finish with default status:")
+    result = executor.execute("finish", {
+        "result": "Analysis complete. The transformer architecture shows..."
+    })
+    print_result(result)
+    if result.success and isinstance(result.output, dict):
+        print(f"  Status (default): {result.output.get('status')}")
+
+    # Test 3: Finish with partial status
+    print("\n[3] Finish with partial completion:")
+    result = executor.execute("finish", {
+        "result": "Found 3 out of 5 requested papers. The remaining 2 were not available.",
+        "status": "partial"
+    })
+    print_result(result)
+
+    # Test 4: Finish with failed status
+    print("\n[4] Finish with failed status:")
+    result = executor.execute("finish", {
+        "result": "Could not complete the task due to missing dependencies.",
+        "status": "failed"
+    })
+    print_result(result)
+
+    # Test 5: Empty result (should fail)
+    print("\n[5] Finish with empty result (should fail):")
+    result = executor.execute("finish", {"result": ""})
+    print_result(result)
+
+    # Test 6: Invalid status (should fail)
+    print("\n[6] Finish with invalid status (should fail):")
+    result = executor.execute("finish", {
+        "result": "Some result",
+        "status": "invalid_status"
+    })
+    print_result(result)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Test tools with configurable selection")
     parser.add_argument(
         "--tools",
         nargs="+",
-        choices=["explore", "move", "view", "search"],
-        default=["explore", "move", "view", "search"],
+        choices=["explore", "move", "view", "search", "finish"],
+        default=["explore", "move", "view", "search", "finish"],
         help="Select which tools to test (default: all)",
     )
     args = parser.parse_args()
@@ -275,6 +337,9 @@ def main():
 
     if "search" in args.tools:
         test_search_library_tool()
+
+    if "finish" in args.tools:
+        test_finish_tool()
 
     print("\n" + "=" * 60)
     print("All tests completed!")

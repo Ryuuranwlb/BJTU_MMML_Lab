@@ -8,7 +8,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 from pangu_agent.llm_client.client import LLMClient
 from pangu_agent.llm_client.memory import Memory
-from pangu_agent.tools.base import Tool, ToolCall, ToolExecutor
+from pangu_agent.tools.base import Tool, ToolCall, ToolExecutor, ToolResult
+from .utils import finish_tool_stop_condition
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class Agent:
 
     def run(
         self,
-        stop_condition: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        stop_condition: Optional[Callable[[ToolCall, ToolResult], bool]] = finish_tool_stop_condition,
     ) -> Dict[str, Any]:
         """Run agent tool-calling loop until completion.
 
@@ -96,13 +97,7 @@ class Agent:
                     )
 
                     if stop_condition:
-                        should_stop = stop_condition(
-                            {
-                                "tool_name": tool_name,
-                                "tool_args": tool_args,
-                                "result": result,
-                            }
-                        )
+                        should_stop = stop_condition(tc, result)
                         if should_stop:
                             return {
                                 "success": result.success,

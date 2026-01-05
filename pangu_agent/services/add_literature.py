@@ -13,7 +13,7 @@ from pangu_agent.prompts import (
     LITERATURE_ORGANIZER_SYSTEM_PROMPT,
     build_file_organization_prompt,
 )
-from pangu_agent.tools.base import Tool
+from pangu_agent.tools import Tool, ToolCall, ToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +124,9 @@ class AddLiteratureService:
         agent.add_system_prompt(LITERATURE_ORGANIZER_SYSTEM_PROMPT)
         agent.add_user_message(build_file_organization_prompt(inbox_path, file_content))
 
-        def stop_when_file_moved(context: Dict[str, Any]) -> bool:
+        def stop_when_file_moved(tool_call: ToolCall, tool_result: ToolResult) -> bool:
             """Stop when move_file tool is successfully executed."""
-            return context["tool_name"] == "move_file" and context["result"].success
+            return tool_call.name == "move_file" and tool_result.success
 
         result = agent.run(stop_condition=stop_when_file_moved)
 
