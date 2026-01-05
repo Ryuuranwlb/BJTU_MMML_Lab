@@ -20,7 +20,7 @@ class ViewFileTool(Tool):
             ),
             parameters=[
                 ToolParameter(
-                    name="path",
+                    name="file_path",
                     type="string",
                     description=(
                         "Library-relative file path. "
@@ -44,9 +44,9 @@ class ViewFileTool(Tool):
         self._manager = manager
 
     def run(self, arguments: ToolCallArguments) -> dict[str, str]:
-        raw_path = str(arguments.get("path", "")).strip()
+        raw_path = str(arguments.get("file_path", "")).strip()
         if not raw_path:
-            raise ValueError("path is required")
+            raise ValueError("file_path is required")
 
         info_type = str(arguments.get("info_type", "both")).strip().lower()
         if info_type not in ["content", "overview", "both"]:
@@ -56,13 +56,10 @@ class ViewFileTool(Tool):
 
         # Map info_type to manager parameters
         if info_type == "overview":
-            # Only metadata/description, no content
             payload = self._manager.read_file(raw_path, include_content=False, include_meta=True)
         elif info_type == "content":
-            # Only content, no metadata
             payload = self._manager.read_file(raw_path, include_content=True, include_meta=False)
-        else:  # both
-            # Full information
+        else:
             payload = self._manager.read_file(raw_path, include_content=True, include_meta=True)
 
         return payload

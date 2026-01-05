@@ -64,14 +64,8 @@ class LibraryManager:
         return self._inbox
 
     def stage_copy(self, source_path: str) -> Path:
-        """Copy an external file into the inbox and create metadata.
+        """Copy an external file into the inbox and create metadata."""
 
-        Args:
-            source_path: Path to the source file to stage
-
-        Returns:
-            Path to the staged file in the inbox
-        """
         source = Path(source_path).expanduser().resolve()
         if not source.is_file():
             raise FileNotFoundError(f"Source file not found: {source}")
@@ -88,6 +82,7 @@ class LibraryManager:
         }
 
         # Generate description via LLM
+        # TODO: generate authors, title, year
         try:
             description = self._generate_description(dest)
             if description:
@@ -197,7 +192,7 @@ class LibraryManager:
         return metadata
 
     def _metadata_path(self, file_path: Path) -> Path:
-        return file_path.with_name(f"{file_path.name}.meta.json")
+        return file_path.with_name(f".{file_path.name}.meta.json")
 
     def _read_metadata(self, meta_path: Path) -> Dict[str, Any]:
         if not meta_path.exists():
@@ -270,24 +265,14 @@ class LibraryManager:
         return "\n".join(chunks).strip()
 
     def _generate_description(self, file_path: Path) -> Optional[str]:
-        """Generate a description for a file using LLM.
-
-        Args:
-            file_path: Path to the file (must be within library root)
-
-        Returns:
-            Generated description string, or None if generation fails
-        """
+        """Generate a description for a file using LLM."""
         from pangu_agent.llm_client import Memory
 
         try:
-            # Get relative path for read_file
             relative_path = file_path.relative_to(self._root)
 
-            # Read file content using existing read_file method
             file_data = self.read_file(str(relative_path), include_content=True, include_meta=False)
 
-            # Build LLM prompt based on file type
             memory = Memory()
             memory.add(
                 "system",
@@ -301,10 +286,8 @@ class LibraryManager:
                 text = file_data.get("text", "")
                 if not text:
                     logger.warning(f"Empty text content: {file_path}")
-                    return None
-                # Limit content length for LLM
-                content_preview = text[:4000] if len(text) > 4000 else text
-                memory.add("user", f"Please describe this PDF file:\n\n{content_preview}")
+                    return None 
+                memory.add("user", f"Please describe this PDF file:\n\n{text}")
             elif kind == "image":
                 # Image content (already in data URL format)
                 image_url = file_data.get("image_url")
@@ -322,7 +305,6 @@ class LibraryManager:
                 logger.warning(f"Unsupported file kind: {kind}")
                 return None
 
-            # Call LLM
             response = self._llm_client.completion(memory)
             if response:
                 return response.strip()
