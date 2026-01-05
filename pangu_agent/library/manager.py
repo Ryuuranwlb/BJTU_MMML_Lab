@@ -175,19 +175,29 @@ class LibraryManager:
             raise FileNotFoundError(f"Path not found: {start}")
         if not start.is_dir():
             raise NotADirectoryError(f"Not a directory: {start}")
+        
+        def is_inside(start: Path, inbox: Path) -> bool:
+            try:
+                start.resolve().relative_to(inbox.resolve())
+                return True
+            except ValueError:
+                return False
+        if is_inside(start, self._inbox):
+            raise ValueError(f"Cannot list children inside inbox: {start}")
+        
         try:
             all_entries = start.iterdir()
             # Filter out metadata files (starting with .) and only keep PDFs, images, or directories
             filtered = [
                 p for p in all_entries
-                # if not p.name.startswith('.') and (
-                #     p.is_dir() or 
-                #     p.suffix.lower() in ['.pdf', '.jpg', '.jpeg', '.png']
-                # )
-                if p.is_dir() or (
-                    not p.name.startswith('.') and
+                if not p.name.startswith('.') and (
+                    p.is_dir() or 
                     p.suffix.lower() in ['.pdf', '.jpg', '.jpeg', '.png']
                 )
+                # if p.is_dir() or (
+                #     not p.name.startswith('.') and
+                #     p.suffix.lower() in ['.pdf', '.jpg', '.jpeg', '.png']
+                # )
             ]
             return sorted(filtered, key=lambda p: (p.is_file(), p.name.lower()))
         except OSError as exc:
