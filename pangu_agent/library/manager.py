@@ -134,8 +134,12 @@ class LibraryManager:
             # Filter out metadata files (starting with .) and only keep PDFs, images, or directories
             filtered = [
                 p for p in all_entries
-                if not p.name.startswith('.') and (
-                    p.is_dir() or 
+                # if not p.name.startswith('.') and (
+                #     p.is_dir() or 
+                #     p.suffix.lower() in ['.pdf', '.jpg', '.jpeg', '.png']
+                # )
+                if p.is_dir() or (
+                    not p.name.startswith('.') and
                     p.suffix.lower() in ['.pdf', '.jpg', '.jpeg', '.png']
                 )
             ]
