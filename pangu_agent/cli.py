@@ -74,11 +74,21 @@ def run(
     _configure_logging(verbose)
 
     action = action.lower()
+
     if action == "add":
         if not path:
             raise click.UsageError("--path is required for add.")
 
-        with console.status("[bold blue]Initializing...", spinner="dots"):
+        # Display task header
+        console.print()
+        console.print("[bold cyan]┌─ 🍄 PangGu Add Literature ─────────────────┐[/bold cyan]")
+        console.print(f"[bold cyan]│[/bold cyan] [dim]Path:[/dim] [cyan]{path}[/cyan]")
+        if prompt:
+            console.print(f"[bold cyan]│[/bold cyan] [dim]Context:[/dim] {prompt}")
+        console.print("[bold cyan]└────────────────────────────────────────────┘[/bold cyan]")
+        console.print()
+
+        with console.status("[bold blue]│ Initializing...", spinner="dots"):
             manager = LibraryManager(library_root)
             llm_client = LLMClient(log=verbose)
             tools = [
@@ -90,14 +100,16 @@ def run(
             service = AddLiteratureService(manager, llm_client, tools)
 
         # Scan for files first
-        console.print(f"[cyan]Scanning:[/cyan] {path}")
+        console.print("[bold blue]│[/bold blue] Scanning for files...")
         files = service.scan_addable_files(path)
 
         if not files:
-            console.print("[yellow]No addable files found (looking for PDFs and images)[/yellow]")
+            console.print("[bold yellow]│[/bold yellow] No addable files found (PDFs and images)")
+            console.print()
             return
 
-        console.print(f"[green]Found {len(files)} file(s) to add[/green]\n")
+        console.print(f"[bold green]│[/bold green] Found [bold]{len(files)}[/bold] file(s) to add")
+        console.print()
 
         # Process files with progress bar
         results = []
@@ -108,11 +120,11 @@ def run(
             TaskProgressColumn(),
             console=console,
         ) as progress:
-            task = progress.add_task("[cyan]Adding files...", total=len(files))
+            task = progress.add_task("[bold blue]│[/bold blue] [cyan]Processing files...", total=len(files))
 
             for file_path in files:
                 file_name = Path(file_path).name
-                progress.update(task, description=f"[cyan]Processing: {file_name}")
+                progress.update(task, description=f"[bold blue]│[/bold blue] [cyan]{file_name}")
 
                 result = service.add_file_with_llm(str(file_path), user_prompt=prompt)
                 results.append(result)
@@ -120,6 +132,7 @@ def run(
                 progress.advance(task)
 
         # Print results
+        console.print()
         _print_add_results(results)
         return
 
@@ -127,7 +140,14 @@ def run(
         if not prompt:
             raise click.UsageError("--prompt is required for search.")
 
-        with console.status("[bold blue]Initializing...", spinner="dots"):
+        # Display task header
+        console.print()
+        console.print("[bold cyan]┌─ 🍄 PangGu Search Library ─────────────────┐[/bold cyan]")
+        console.print(f"[bold cyan]│[/bold cyan] [bold]Query:[/bold] {prompt}")
+        console.print("[bold cyan]└────────────────────────────────────────────┘[/bold cyan]")
+        console.print()
+
+        with console.status("[bold blue]│ Initializing...", spinner="dots"):
             manager = LibraryManager(library_root)
             llm_client = LLMClient(log=verbose)
             tools = [
@@ -138,12 +158,11 @@ def run(
             ]
             service = SearchFilesService(manager, llm_client, tools)
 
-        console.print(Panel(f"[bold]Query:[/bold] {prompt}", border_style="blue"))
-
-        with console.status("[bold green]Searching library...", spinner="dots"):
+        with console.status("[bold green]│ Searching library...", spinner="dots"):
             result = service.search(prompt)
 
         # Print results
+        console.print()
         _print_search_results(result)
         return
 
@@ -169,13 +188,25 @@ def run(
 )
 def interactive(library_root: str, verbose: bool):
     """Start an interactive chat session with PangGu🍄 assistant."""
+    # Lazy imports to avoid circular dependency
+    from pangu_agent.services.interactive import InteractiveService
+    from pangu_agent.tools.add_literature import AddLiteratureTool
+
     # Configure logging
     _configure_logging(verbose)
 
-    # Initialize components
-    console.print("[bold cyan]Initializing PangGu🍄 Interactive Assistant...[/bold cyan]")
+    # Clear screen for a fresh start
+    console.clear()
 
-    with console.status("[bold blue]Loading...", spinner="dots"):
+    # Display banner
+    console.print()
+    console.print("[bold cyan]╔══════════════════════════════════════════════╗[/bold cyan]")
+    console.print("[bold cyan]║[/bold cyan]    🍄 PangGu Literature Assistant 🍄      [bold cyan]║[/bold cyan]")
+    console.print("[bold cyan]╚══════════════════════════════════════════════╝[/bold cyan]")
+    console.print()
+
+    # Initialize components
+    with console.status("[bold blue]Loading components...", spinner="dots"):
         manager = LibraryManager(library_root)
         llm_client = LLMClient(log=verbose)
 
@@ -209,64 +240,77 @@ def interactive(library_root: str, verbose: bool):
         )
 
     # Display welcome message
-    console.print()
-    console.print(Panel.fit(
-        "[bold green]Welcome to PangGu🍄 Interactive Assistant![/bold green]\n\n"
-        f"[dim]Library: {library_root}[/dim]\n\n"
-        "I can help you:\n"
-        "  • Search for papers and files\n"
-        "  • Add and organize new literature\n"
-        "  • Explore the library structure\n"
-        "  • View and analyze file contents\n"
-        "  • Move and reorganize files\n\n"
-        "[dim]Type your message or 'exit' to quit. Type 'reset' to clear conversation history.[/dim]",
-        border_style="cyan",
-        title="🍄 PangGu Assistant"
+    console.print(Panel(
+        f"[dim]Library:[/dim] [cyan]{library_root}[/cyan]\n\n"
+        "[bold]I can help you with:[/bold]\n"
+        "  [green]•[/green] Search for papers and files\n"
+        "  [green]•[/green] Add and organize new literature\n"
+        "  [green]•[/green] Explore the library structure\n"
+        "  [green]•[/green] View and analyze file contents\n"
+        "  [green]•[/green] Move and reorganize files\n\n"
+        "[dim]Commands: [cyan]exit[/cyan] to quit, [cyan]reset[/cyan] to clear history[/dim]",
+        border_style="green",
+        title="[bold green]Ready to assist![/bold green]",
+        title_align="left",
     ))
     console.print()
 
     # Main interaction loop
+    conversation_count = 0
     while True:
         try:
-            # Get user input
-            user_input = console.input("[bold blue]You:[/bold blue] ").strip()
+            # Get user input with a clean prompt
+            user_input = console.input("[bold blue]│[/bold blue] [bold white]You[/bold white] [bold blue]›[/bold blue] ").strip()
 
             if not user_input:
                 continue
 
+            # Handle exit commands
             if user_input.lower() in ["exit", "quit", "q"]:
-                console.print("[yellow]Goodbye! 👋[/yellow]")
+                console.print()
+                console.print("[dim]─[/dim]" * 50)
+                console.print("[bold yellow]Thanks for using PangGu! Goodbye! 👋[/bold yellow]")
+                console.print()
                 break
 
+            # Handle reset command
             if user_input.lower() == "reset":
                 service.reset()
-                console.print("[green]✓ Conversation history reset[/green]\n")
+                conversation_count = 0
+                console.print("[bold green]│[/bold green] [dim]✓ Conversation history cleared[/dim]\n")
                 continue
 
             # Process the message with a spinner
-            with console.status("[bold green]PangGu🍄 is thinking...", spinner="dots"):
+            console.print()
+            with console.status("[bold green]│[/bold green] [dim]PangGu🍄 is thinking...[/dim]", spinner="dots"):
                 result = service.chat(user_input)
 
-            # Display the response
+            # Display the response with visual separator
+            conversation_count += 1
+            console.print("[bold green]│[/bold green] [bold green]PangGu🍄[/bold green] [bold green]›[/bold green]", end=" ")
+
             if result["success"]:
-                console.print(f"\n[bold green]PangGu🍄:[/bold green] {result['response']}")
+                console.print(result['response'])
                 if verbose:
-                    console.print(f"[dim]({result['iterations']} iterations)[/dim]")
+                    console.print(f"[bold green]│[/bold green] [dim]↳ {result['iterations']} iterations[/dim]")
             else:
-                console.print(f"\n[bold red]PangGu🍄:[/bold red] {result['response']}")
+                console.print(f"[red]{result['response']}[/red]")
                 if verbose:
-                    console.print(f"[dim]Reason: {result['stop_reason']}[/dim]")
+                    console.print(f"[bold green]│[/bold green] [dim]↳ Error: {result['stop_reason']}[/dim]")
 
             console.print()
 
         except KeyboardInterrupt:
-            console.print("\n[yellow]Goodbye! 👋[/yellow]")
+            console.print("\n")
+            console.print("[dim]─[/dim]" * 50)
+            console.print("[bold yellow]Interrupted. Goodbye! 👋[/bold yellow]")
+            console.print()
             break
         except Exception as e:
-            console.print(f"\n[red]Error: {e}[/red]\n")
+            console.print(f"\n[bold red]│[/bold red] [red]Error: {e}[/red]\n")
             if verbose:
                 import traceback
-                console.print(f"[dim]{traceback.format_exc()}[/dim]")
+                console.print(f"[dim]{traceback.format_exc()}[/dim]\n")
 
 
 
@@ -310,35 +354,65 @@ def _configure_logging(verbose: bool):
 def _print_add_results(results: list[dict[str, Any]]):
     """Print results from add operation with rich formatting."""
     if not results:
-        console.print("[yellow]No files were added.[/yellow]")
+        console.print("[bold yellow]│[/bold yellow] No files were added.")
+        console.print()
         return
 
     success_count = sum(1 for r in results if r.get("success"))
     total_count = len(results)
 
-    # Create a table for results
-    table = Table(title=f"\nPangGu🍄 added {success_count}/{total_count} file(s)", show_header=True, header_style="bold")
-    table.add_column("Status", style="dim", width=8)
-    table.add_column("Source", style="cyan")
-    table.add_column("Destination", style="green")
+    # Summary header
+    if success_count == total_count:
+        status_text = "[bold green]✓ Success[/bold green]"
+        status_color = "green"
+    elif success_count > 0:
+        status_text = "[bold yellow]⚠ Partial Success[/bold yellow]"
+        status_color = "yellow"
+    else:
+        status_text = "[bold red]✗ Failed[/bold red]"
+        status_color = "red"
 
-    for result in results:
+    console.print(f"{status_text} - Added [bold]{success_count}[/bold] of [bold]{total_count}[/bold] file(s)")
+    console.print()
+
+    # Create a table for results
+    table = Table(
+        show_header=True,
+        header_style="bold cyan",
+        border_style=status_color,
+        title="📚 Results",
+        title_style=f"bold {status_color}"
+    )
+    table.add_column("", style="dim", width=3, justify="center")
+    table.add_column("Source File", style="cyan", no_wrap=False)
+    table.add_column("Destination", style="green", no_wrap=False)
+
+    for i, result in enumerate(results, 1):
         source = Path(result.get("source", "unknown")).name
         if result.get("success"):
             dest = result.get("destination", "unknown")
             table.add_row("✓", source, dest)
         else:
             error = result.get("error", "unknown error")
-            table.add_row("✗", source, f"[red]{error}[/red]")
+            # Truncate long error messages
+            error_short = error if len(error) < 50 else error[:47] + "..."
+            table.add_row("✗", source, f"[red]{error_short}[/red]")
 
     console.print(table)
+    console.print()
 
 
 def _print_search_results(result: dict[str, Any]):
     """Print results from search operation with rich formatting."""
     if not result.get("success"):
         error = result.get("error", "Unknown error")
-        console.print(Panel(f"[red]✗ Search failed:[/red] {error}", border_style="red"))
+        console.print()
+        console.print(Panel(
+            f"[bold red]✗ Search Failed[/bold red]\n\n{error}",
+            border_style="red",
+            title="Error"
+        ))
+        console.print()
         return
 
     files = result.get("files", [])
@@ -346,53 +420,81 @@ def _print_search_results(result: dict[str, Any]):
     iterations = result.get("iterations", "N/A")
 
     # Success header
-    console.print(f"\n[green]✓ PangGu🍄 completed search in {iterations} iteration(s)[/green]\n")
+    console.print(f"[bold green]✓ Search completed[/bold green] [dim]({iterations} iterations)[/dim]")
+    console.print()
 
     # Files table
     if files:
-        table = Table(title=f"PangGu🍄 found {len(files)} relevant file(s)", show_header=True, header_style="bold cyan")
+        table = Table(
+            show_header=True,
+            header_style="bold cyan",
+            border_style="green",
+            title=f"📄 Found {len(files)} relevant file(s)",
+            title_style="bold green"
+        )
         table.add_column("#", justify="right", style="dim", width=4)
-        table.add_column("File Path", style="green")
+        table.add_column("File Path", style="cyan", no_wrap=False)
 
         for i, file_path in enumerate(files, 1):
             table.add_row(str(i), file_path)
 
         console.print(table)
+        console.print()
     else:
-        console.print("[yellow]No files found.[/yellow]")
+        console.print("[bold yellow]│[/bold yellow] No relevant files found")
+        console.print()
 
     # Observation panel
     if observation:
-        console.print("\n")
-        console.print(Panel(observation, title="[bold]Observation[/bold]", border_style="blue"))
+        console.print(Panel(
+            observation,
+            title="[bold cyan]💡 Observation[/bold cyan]",
+            title_align="left",
+            border_style="blue",
+            padding=(1, 2)
+        ))
+        console.print()
 
 
 def _reset_library(library_root: str):
     """Reset the library by removing all contents."""
-    # Confirm with user
-    console.print(f"[yellow]WARNING:[/yellow] This will delete all contents in: [cyan]{library_root}[/cyan]")
+    # Display warning header
+    console.print()
+    console.print("[bold red]┌─ ⚠️  WARNING ──────────────────────────────┐[/bold red]")
+    console.print(f"[bold red]│[/bold red] This will delete all contents in:")
+    console.print(f"[bold red]│[/bold red] [cyan]{library_root}[/cyan]")
+    console.print("[bold red]└────────────────────────────────────────────┘[/bold red]")
+    console.print()
+
     if not click.confirm("Are you sure you want to reset the library?"):
-        console.print("[yellow]Reset cancelled.[/yellow]")
+        console.print("[bold yellow]│[/bold yellow] Reset cancelled")
+        console.print()
         return
 
     # Initialize manager and perform reset
     try:
-        with console.status("[bold red]Resetting library...", spinner="dots"):
+        console.print()
+        with console.status("[bold red]│ Resetting library...", spinner="dots"):
             manager = LibraryManager(library_root)
             result = manager.reset()
 
+        console.print()
         if result["success"]:
             removed_count = result["removed_count"]
             message = result.get("message", "")
 
             if removed_count == 0:
-                console.print(f"\n[yellow]{message}[/yellow]")
+                console.print(f"[bold yellow]│[/bold yellow] {message}")
             else:
-                console.print(f"\n[green]✓ PangGu🍄 successfully reset library:[/green] {library_root}")
-                console.print(f"  [dim]Removed {removed_count} item(s)[/dim]")
+                console.print(f"[bold green]│[/bold green] ✓ Library reset successfully")
+                console.print(f"[bold green]│[/bold green] [dim]Removed {removed_count} item(s)[/dim]")
         else:
             error = result.get("error", "Unknown error")
-            console.print(Panel(f"[red]✗ Failed to reset library:[/red] {error}", border_style="red"))
+            console.print(Panel(
+                f"[bold red]Reset Failed[/bold red]\n\n{error}",
+                border_style="red",
+                title="Error"
+            ))
     except Exception as e:
         console.print(Panel(f"[red]✗ Failed to reset library:[/red] {e}", border_style="red"))
 

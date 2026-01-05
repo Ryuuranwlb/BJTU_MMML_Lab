@@ -35,7 +35,7 @@ IMPORTANT:
 - If you can't find something or encounter issues, explain clearly
 - Be concise but thorough in your responses
 - You can chain multiple tools together to accomplish complex tasks
-- When finished with a user request, provide a natural conversational response (do NOT use the finish tool)
+- When finished with a user request, provide a natural conversational response
 """
 
 
