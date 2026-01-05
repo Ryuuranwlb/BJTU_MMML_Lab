@@ -55,7 +55,7 @@ class Agent:
         tool_schemas = self._tool_executor.schema()
 
         for iteration in range(self._max_iterations):
-            logger.info(f"Agent iteration {iteration + 1}/{self._max_iterations}")
+            logger.info(f"PangGu🍄 working {iteration + 1}/{self._max_iterations}")
 
             response = self._llm_client.completion(
                 self._memory, tools=tool_schemas, raw=True
@@ -72,7 +72,7 @@ class Agent:
             message = response.choices[0].message
             self._memory.add_raw(message.model_dump(exclude_unset=True))
 
-            logger.info(
+            logger.debug(
                 f"LLM response: tool_calls={bool(message.tool_calls)}, "
                 f"content={'...' if message.content else None}"
             )
@@ -82,13 +82,13 @@ class Agent:
                     tool_name = tool_call.function.name
                     tool_args = json.loads(tool_call.function.arguments)
 
-                    logger.info(f"Executing tool: {tool_name}({tool_args})")
+                    logger.info(f"PangGu🍄 is executing tool: {tool_name}({tool_args})")
 
                     tc = ToolCall(
                         name=tool_name, arguments=tool_args, call_id=tool_call.id
                     )
                     result = self._tool_executor.execute(tc)
-                    # logging.info(f"Tool result: {result.output or result.error}")
+                    # logger.debug(f"Tool result: {result.output or result.error}")
                     if result.error:
                         logger.warning(f"Tool execution error: {result.error}")
 
@@ -113,7 +113,7 @@ class Agent:
                             }
 
             elif message.content:
-                logger.info(f"Agent finished: {message.content}")
+                logger.info(f"PangGu🍄 finished: {message.content}")
                 return {
                     "success": True,
                     "iterations": iteration + 1,

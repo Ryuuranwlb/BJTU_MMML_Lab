@@ -61,7 +61,7 @@ class AddLiteratureService:
             # Stage file to inbox
             staged_path = self._manager.stage_copy(file_path)
             inbox_relative = staged_path.relative_to(self._manager.root)
-            logger.info(f"Staged file to: {inbox_relative}")
+            logger.debug(f"Staged file to: {inbox_relative}")
 
             # Read file content for LLM context
             file_content = self._manager.read_file(str(inbox_relative))
@@ -103,7 +103,7 @@ class AddLiteratureService:
             logger.warning(f"No addable files found in: {source_path}")
             return []
 
-        logger.info(f"Found {len(files)} file(s) to add")
+        logger.info(f"PangGu🍄 Found {len(files)} file(s) to add")
 
         results: List[Dict[str, Any]] = []
         for file_path in files:

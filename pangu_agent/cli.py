@@ -5,6 +5,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+logging.getLogger().setLevel(logging.ERROR)
+
 import click
 from rich.console import Console
 from rich.logging import RichHandler
@@ -164,20 +166,39 @@ def interactive(library_root: str):
 
 def _configure_logging(verbose: bool):
     """Configure logging based on verbose flag."""
+    # Keep root logger at ERROR to silence third-party libraries
+    root = logging.getLogger()
+    root.setLevel(logging.ERROR)
+
+    # Create a dedicated handler for pangu_agent loggers
+    handler = RichHandler(
+        console=console,
+        rich_tracebacks=True,
+        show_time=verbose,
+        show_path=False,
+    )
+    handler.setFormatter(logging.Formatter("%(message)s", datefmt="[%X]"))
+
     if verbose:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(message)s",
-            datefmt="[%X]",
-            handlers=[RichHandler(console=console, rich_tracebacks=True)],
-        )
+        handler.setLevel(logging.INFO)
+        level = logging.INFO
     else:
-        # Disable all logging except errors
-        logging.basicConfig(
-            level=logging.ERROR,
-            format="%(message)s",
-            handlers=[RichHandler(console=console, show_time=False, show_path=False)],
-        )
+        handler.setLevel(logging.ERROR)
+        level = logging.ERROR
+
+    # Configure all pangu_agent module loggers with their own handler
+    for logger_name in ["pangu_agent", "pangu_agent.agent", "pangu_agent.llm_client",
+                        "pangu_agent.services", "pangu_agent.library"]:
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(level)
+        logger.handlers.clear()
+        logger.addHandler(handler)
+        logger.propagate = False  # Don't propagate to root logger
+
+    # Suppress warnings from third-party libraries
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="open_clip")
+    warnings.filterwarnings("ignore", category=UserWarning, module="torch")
 
 
 def _print_add_results(results: list[dict[str, Any]]):
@@ -190,7 +211,7 @@ def _print_add_results(results: list[dict[str, Any]]):
     total_count = len(results)
 
     # Create a table for results
-    table = Table(title=f"\nAdded {success_count}/{total_count} file(s)", show_header=True, header_style="bold")
+    table = Table(title=f"\nPangGu🍄 added {success_count}/{total_count} file(s)", show_header=True, header_style="bold")
     table.add_column("Status", style="dim", width=8)
     table.add_column("Source", style="cyan")
     table.add_column("Destination", style="green")
@@ -219,11 +240,11 @@ def _print_search_results(result: dict[str, Any]):
     iterations = result.get("iterations", "N/A")
 
     # Success header
-    console.print(f"\n[green]✓ Search completed in {iterations} iteration(s)[/green]\n")
+    console.print(f"\n[green]✓ PangGu🍄 completed search in {iterations} iteration(s)[/green]\n")
 
     # Files table
     if files:
-        table = Table(title=f"Found {len(files)} relevant file(s)", show_header=True, header_style="bold cyan")
+        table = Table(title=f"PangGu🍄 found {len(files)} relevant file(s)", show_header=True, header_style="bold cyan")
         table.add_column("#", justify="right", style="dim", width=4)
         table.add_column("File Path", style="green")
 
@@ -261,7 +282,7 @@ def _reset_library(library_root: str):
             if removed_count == 0:
                 console.print(f"\n[yellow]{message}[/yellow]")
             else:
-                console.print(f"\n[green]✓ Successfully reset library:[/green] {library_root}")
+                console.print(f"\n[green]✓ PangGu🍄 successfully reset library:[/green] {library_root}")
                 console.print(f"  [dim]Removed {removed_count} item(s)[/dim]")
         else:
             error = result.get("error", "Unknown error")

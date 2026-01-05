@@ -49,7 +49,7 @@ class LLMClient:
                 )
 
                 if self.log:
-                    logger.info("Initialized AzureOpenAI client with api_key (deployment='%s')", self.deployment_name)
+                    logger.debug("Initialized AzureOpenAI client with api_key (deployment='%s')", self.deployment_name)
                 return
             except Exception as e:
                 logger.exception("Failed to init AzureOpenAI with api_key (deployment='%s'): %s", self.deployment_name, e)
@@ -71,7 +71,7 @@ class LLMClient:
                 )
 
                 if self.log:
-                    logger.info("Initialized AzureOpenAI client with AzureCliCredential (deployment='%s')", self.deployment_name)
+                    logger.debug("Initialized AzureOpenAI client with AzureCliCredential (deployment='%s')", self.deployment_name)
                 return
             except Exception as e:
                 logger.exception("Failed to init AzureOpenAI with AzureCliCredential (deployment='%s'): %s", self.deployment_name, e)
@@ -101,7 +101,7 @@ class LLMClient:
 
                 duration = round(time.time() - start, 2)
                 if self.log:
-                    logger.info(
+                    logger.debug(
                         "Model '%s' responded in %.2fs (retry=%d)",
                         self.deployment_name,
                         duration,

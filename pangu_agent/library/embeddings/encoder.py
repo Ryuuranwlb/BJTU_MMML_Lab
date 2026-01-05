@@ -51,7 +51,7 @@ class OpenCLIPEncoder:
         else:
             self._device = torch.device(device)
 
-        logger.info(f"Loading OpenCLIP model '{model_name}' with '{pretrained}' weights on {self._device}")
+        logger.debug(f"Loading OpenCLIP model '{model_name}' with '{pretrained}' weights on {self._device}")
 
         # Load model
         try:
@@ -64,7 +64,7 @@ class OpenCLIPEncoder:
         except Exception as exc:
             raise RuntimeError(f"Failed to load OpenCLIP model: {exc}") from exc
 
-        logger.info(f"OpenCLIP encoder initialized successfully")
+        logger.debug(f"OpenCLIP encoder initialized successfully")
 
     @property
     def embedding_dim(self) -> int:

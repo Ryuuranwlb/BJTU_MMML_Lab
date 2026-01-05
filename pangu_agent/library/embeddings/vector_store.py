@@ -52,7 +52,7 @@ class VectorStore:
         # Ensure storage directory exists
         self._storage_path.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Initializing ChromaDB at {self._storage_path}")
+        logger.debug(f"Initializing ChromaDB at {self._storage_path}")
 
         # Create persistent client
         self._client = chromadb.PersistentClient(
@@ -69,7 +69,7 @@ class VectorStore:
             metadata={"hnsw:space": "cosine"},  # Use cosine distance
         )
 
-        logger.info(
+        logger.debug(
             f"Vector store ready with {self._collection.count()} embeddings"
         )
 

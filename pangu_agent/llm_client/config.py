@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 import json
 import yaml
 import os
+import logging
 
 
 @dataclass
@@ -62,7 +63,7 @@ class LLMConfig:
         if isinstance(source, str):
             # File path or raw text
             if os.path.exists(source):
-                print(f"Loading LLMConfig from file: {source}")
+                logging.debug(f"Loading LLMConfig from file: {source}")
                 with open(source, "r", encoding="utf-8") as f:
                     text = f.read()
             else:

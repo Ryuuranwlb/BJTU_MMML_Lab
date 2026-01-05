@@ -58,14 +58,14 @@ class LibraryManager:
             self._llm_client = llm_client
 
         # Initialize embedding system
-        logger.info("Initializing embedding system...")
+        logger.debug("Initializing embedding system...")
         from pangu_agent.library.embeddings import OpenCLIPEncoder, VectorStore
 
         self._encoder = OpenCLIPEncoder()
         self._vector_store = VectorStore(
             storage_path=self._root / ".vector_store"
         )
-        logger.info("Embedding system ready")
+        logger.debug("Embedding system ready")
 
     @property
     def root(self) -> Path:
@@ -99,7 +99,7 @@ class LibraryManager:
             description = self._generate_description(dest)
             if description:
                 metadata["description"] = description
-                logger.info(f"Generated description for {dest.name}")
+                logger.info(f"PangGu🍄 generated description for {dest.name}")
         except Exception as exc:
             logger.warning(f"Failed to generate description for {dest.name}: {exc}")
 
@@ -120,7 +120,7 @@ class LibraryManager:
                     "file_type": file_type
                 }
             )
-            logger.info(f"Generated embedding for {dest.name}")
+            logger.debug(f"Generated embedding for {dest.name}")
         except Exception as exc:
             logger.warning(f"Failed to generate embedding for {dest.name}: {exc}")
 
@@ -471,7 +471,7 @@ class LibraryManager:
                 storage_path=self._root / ".vector_store"
             )
 
-            logger.info(f"Library reset complete: removed {total_items} items")
+            logger.info(f"PangGu🍄 reset the library: removed {total_items} items")
             return {
                 "success": True,
                 "removed_count": total_items,
