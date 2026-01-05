@@ -25,13 +25,14 @@ Create a meaningful directory structure based on the file's research topic."""
 
 
 def build_file_organization_prompt(
-    inbox_path: Path, file_content: Dict[str, Any]
+    inbox_path: Path, file_content: Dict[str, Any], user_prompt: str | None = None
 ) -> str:
     """Build user prompt for organizing a specific file.
 
     Args:
         inbox_path: Path to the file in inbox
         file_content: File content dict with 'kind', 'text', 'meta_data', etc.
+        user_prompt: Optional user-provided prompt for additional context
 
     Returns:
         Formatted prompt string
@@ -48,6 +49,9 @@ def build_file_organization_prompt(
     metadata = file_content.get("meta_data", {})
     if metadata:
         parts.append(f"\nMetadata: {json.dumps(metadata, indent=2)}")
+
+    if user_prompt:
+        parts.append(f"\n\nUser request: {user_prompt}")
 
     parts.append(
         "\n\nPlease explore the library structure and decide where this file should be placed. "

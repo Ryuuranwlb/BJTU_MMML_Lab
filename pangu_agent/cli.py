@@ -42,12 +42,12 @@ DEFAULT_LIBRARY_ROOT = Path(__file__).resolve().parents[1] / "library"
     help="Fixed task to execute in run mode.",
 )
 @click.option("--path", help="Path to add (for add).")
-@click.option("--query", help="Query text")
+@click.option("--prompt", help="Optional prompt for add, required query for search")
 def run(
     library_root: str,
     action: str,
     path: str | None,
-    query: str | None,
+    prompt: str | None,
 ):
     """Run a fixed task (no embeddings/LLM yet)."""
 
@@ -70,15 +70,15 @@ def run(
 
         # Create service and execute add
         service = AddLiteratureService(manager, llm_client, tools)
-        results = service.add_path(path)
+        results = service.add_path(path, user_prompt=prompt)
 
         # Print results
         _print_add_results(results)
         return
 
     if action == "search":
-        if not query:
-            raise click.UsageError("--query is required for search.")
+        if not prompt:
+            raise click.UsageError("--prompt is required for search.")
 
         # Initialize components
         manager = LibraryManager(library_root)
@@ -94,7 +94,7 @@ def run(
 
         # Create service and execute search
         service = SearchFilesService(manager, llm_client, tools)
-        result = service.search(query)
+        result = service.search(prompt)
 
         # Print results
         _print_search_results(result)
@@ -117,13 +117,6 @@ def run(
 def interactive(library_root: str):
     """Start a simple interactive session (LLM not wired yet)."""
     pass
-
-
-def _print_result(result: Any):
-    if result.success:
-        click.echo(result.output or "OK")
-    else:
-        click.echo(f"[error] {result.error}")
 
 
 def _print_add_results(results: list[dict[str, Any]]):

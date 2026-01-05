@@ -53,7 +53,9 @@ class AddLiteratureService:
 
         return sorted(addable_files)
 
-    def add_file_with_llm(self, file_path: str) -> Dict[str, Any]:
+    def add_file_with_llm(
+        self, file_path: str, user_prompt: str | None = None
+    ) -> Dict[str, Any]:
         """Add a single file: stage to inbox, let LLM decide location, then move."""
         try:
             # Stage file to inbox
@@ -65,7 +67,9 @@ class AddLiteratureService:
             file_content = self._manager.read_file(str(inbox_relative))
 
             # Ask LLM to move the file (LLM will call move_file tool directly)
-            moved_info = self._ask_llm_to_move_file(inbox_relative, file_content)
+            moved_info = self._ask_llm_to_move_file(
+                inbox_relative, file_content, user_prompt
+            )
 
             if not moved_info:
                 return {
@@ -89,7 +93,9 @@ class AddLiteratureService:
                 "error": str(exc),
             }
 
-    def add_path(self, source_path: str) -> List[Dict[str, Any]]:
+    def add_path(
+        self, source_path: str, user_prompt: str | None = None
+    ) -> List[Dict[str, Any]]:
         """Add a file or recursively add all files in a directory."""
         files = self.scan_addable_files(source_path)
 
@@ -101,7 +107,7 @@ class AddLiteratureService:
 
         results: List[Dict[str, Any]] = []
         for file_path in files:
-            result = self.add_file_with_llm(str(file_path))
+            result = self.add_file_with_llm(str(file_path), user_prompt)
             results.append(result)
 
         return results
@@ -112,7 +118,10 @@ class AddLiteratureService:
         return suffix in [".pdf", ".jpg", ".jpeg", ".png"]
 
     def _ask_llm_to_move_file(
-        self, inbox_path: Path, file_content: Dict[str, Any]
+        self,
+        inbox_path: Path,
+        file_content: Dict[str, Any],
+        user_prompt: str | None = None,
     ) -> Dict[str, str] | None:
         """Use LLM agent to move the file from inbox to appropriate location."""
         agent = Agent(
@@ -122,7 +131,9 @@ class AddLiteratureService:
         )
 
         agent.add_system_prompt(LITERATURE_ORGANIZER_SYSTEM_PROMPT)
-        agent.add_user_message(build_file_organization_prompt(inbox_path, file_content))
+        agent.add_user_message(
+            build_file_organization_prompt(inbox_path, file_content, user_prompt)
+        )
 
         def stop_when_file_moved(tool_call: ToolCall, tool_result: ToolResult) -> bool:
             """Stop when move_file tool is successfully executed."""
