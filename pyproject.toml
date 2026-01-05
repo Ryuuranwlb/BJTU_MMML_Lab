@@ -7,9 +7,14 @@ requires-python = ">=3.11"
 dependencies = [
     "azure-identity>=1.25.1",
     "click>=8.3.1",
+    "numpy>=1.24.0",
+    "open-clip-torch>=2.26.0",
     "openai>=2.14.0",
+    "pillow>=10.0.0",
     "pypdf>=4.2.0",
+    "pytest>=9.0.2",
     "pyyaml>=6.0.3",
+    "torch>=2.0.0",
 ]
 
 [project.scripts]
@@ -17,4 +22,7 @@ pangu = "pangu_agent.cli:main"
 
 [tool.uv]
 package = true
+
+[tool.setuptools]
+packages = ["pangu_agent"]
 
