@@ -88,7 +88,9 @@ class Agent:
                         name=tool_name, arguments=tool_args, call_id=tool_call.id
                     )
                     result = self._tool_executor.execute(tc)
-                    logging.info(f"Tool result: {result.output or result.error}")
+                    # logging.info(f"Tool result: {result.output or result.error}")
+                    if result.error:
+                        logger.warning(f"Tool execution error: {result.error}")
 
                     self._memory.add(
                         "tool",
