@@ -18,7 +18,9 @@ from pangu_agent.library.manager import LibraryManager
 from pangu_agent.llm_client.client import LLMClient
 from pangu_agent.services.add_literature import AddLiteratureService
 from pangu_agent.services.search_files import SearchFilesService
+from pangu_agent.services.interactive import InteractiveService
 from pangu_agent.tools import (
+    AddLiteratureTool,
     ExploreLibraryTool,
     FinishTool,
     MoveFileTool,
@@ -159,9 +161,113 @@ def run(
     show_default=True,
     type=click.Path(file_okay=False),
 )
-def interactive(library_root: str):
-    """Start a simple interactive session (LLM not wired yet)."""
-    pass
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Enable verbose logging (shows agent iterations, tool calls, etc.)",
+)
+def interactive(library_root: str, verbose: bool):
+    """Start an interactive chat session with PangGu🍄 assistant."""
+    # Configure logging
+    _configure_logging(verbose)
+
+    # Initialize components
+    console.print("[bold cyan]Initializing PangGu🍄 Interactive Assistant...[/bold cyan]")
+
+    with console.status("[bold blue]Loading...", spinner="dots"):
+        manager = LibraryManager(library_root)
+        llm_client = LLMClient(log=verbose)
+
+        # Create AddLiteratureService for AddLiteratureTool
+        add_lit_service = AddLiteratureService(
+            manager=manager,
+            llm_client=llm_client,
+            tools=[
+                ExploreLibraryTool(manager),
+                ViewFileTool(manager),
+                MoveFileTool(manager),
+                SearchLibraryTool(manager),
+            ]
+        )
+
+        # Create all available tools for the interactive agent
+        tools = [
+            SearchLibraryTool(manager),
+            ExploreLibraryTool(manager),
+            ViewFileTool(manager),
+            AddLiteratureTool(add_lit_service),
+            MoveFileTool(manager),
+        ]
+
+        # Create interactive service
+        service = InteractiveService(
+            manager=manager,
+            llm_client=llm_client,
+            tools=tools,
+            max_iterations=15,
+        )
+
+    # Display welcome message
+    console.print()
+    console.print(Panel.fit(
+        "[bold green]Welcome to PangGu🍄 Interactive Assistant![/bold green]\n\n"
+        f"[dim]Library: {library_root}[/dim]\n\n"
+        "I can help you:\n"
+        "  • Search for papers and files\n"
+        "  • Add and organize new literature\n"
+        "  • Explore the library structure\n"
+        "  • View and analyze file contents\n"
+        "  • Move and reorganize files\n\n"
+        "[dim]Type your message or 'exit' to quit. Type 'reset' to clear conversation history.[/dim]",
+        border_style="cyan",
+        title="🍄 PangGu Assistant"
+    ))
+    console.print()
+
+    # Main interaction loop
+    while True:
+        try:
+            # Get user input
+            user_input = console.input("[bold blue]You:[/bold blue] ").strip()
+
+            if not user_input:
+                continue
+
+            if user_input.lower() in ["exit", "quit", "q"]:
+                console.print("[yellow]Goodbye! 👋[/yellow]")
+                break
+
+            if user_input.lower() == "reset":
+                service.reset()
+                console.print("[green]✓ Conversation history reset[/green]\n")
+                continue
+
+            # Process the message with a spinner
+            with console.status("[bold green]PangGu🍄 is thinking...", spinner="dots"):
+                result = service.chat(user_input)
+
+            # Display the response
+            if result["success"]:
+                console.print(f"\n[bold green]PangGu🍄:[/bold green] {result['response']}")
+                if verbose:
+                    console.print(f"[dim]({result['iterations']} iterations)[/dim]")
+            else:
+                console.print(f"\n[bold red]PangGu🍄:[/bold red] {result['response']}")
+                if verbose:
+                    console.print(f"[dim]Reason: {result['stop_reason']}[/dim]")
+
+            console.print()
+
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Goodbye! 👋[/yellow]")
+            break
+        except Exception as e:
+            console.print(f"\n[red]Error: {e}[/red]\n")
+            if verbose:
+                import traceback
+                console.print(f"[dim]{traceback.format_exc()}[/dim]")
+
 
 
 def _configure_logging(verbose: bool):

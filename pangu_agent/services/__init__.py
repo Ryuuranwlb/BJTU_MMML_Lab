@@ -2,5 +2,6 @@
 
 from .add_literature import AddLiteratureService
 from .search_files import SearchFilesService
+from .interactive import InteractiveService
 
-__all__ = ["AddLiteratureService", "SearchFilesService"]
+__all__ = ["AddLiteratureService", "SearchFilesService", "InteractiveService"]

@@ -4,16 +4,15 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from pangu_agent.services.add_literature import AddLiteratureService
 from pangu_agent.tools.base import Tool, ToolCallArguments, ToolParameter
 
 
 class AddLiteratureTool(Tool):
     """Add literature files to the library with LLM-guided organization."""
+    
+    _service: Any
 
-    _service: AddLiteratureService
-
-    def __init__(self, service: AddLiteratureService) -> None:
+    def __init__(self, service) -> None:
         super().__init__(
             name="add_literature",
             description=(
