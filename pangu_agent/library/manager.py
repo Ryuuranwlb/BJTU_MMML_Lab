@@ -124,20 +124,22 @@ class LibraryManager:
         return self._read_metadata(meta_path)
 
     def list_children(self, path: Path | str) -> List[Path]:
-        if isinstance(path, str):
-            start = self._context.resolve_path(path)
-        else:
-            start = path.expanduser().resolve()
-            try:
-                start.relative_to(self._root)
-            except ValueError as exc:
-                raise ValueError(f"Path escapes library root: {start}") from exc
+        start = self._context.resolve_path(path)
         if not start.exists():
             raise FileNotFoundError(f"Path not found: {start}")
         if not start.is_dir():
             raise NotADirectoryError(f"Not a directory: {start}")
         try:
-            return sorted(start.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+            all_entries = start.iterdir()
+            # Filter out metadata files (starting with .) and only keep PDFs, images, or directories
+            filtered = [
+                p for p in all_entries
+                if not p.name.startswith('.') and (
+                    p.is_dir() or 
+                    p.suffix.lower() in ['.pdf', '.jpg', '.jpeg', '.png']
+                )
+            ]
+            return sorted(filtered, key=lambda p: (p.is_file(), p.name.lower()))
         except OSError as exc:
             raise OSError(f"Failed to list directory '{start}': {exc}") from exc
 

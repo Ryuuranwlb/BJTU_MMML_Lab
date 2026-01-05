@@ -27,6 +27,7 @@ class ExploreLibraryTool(Tool):
                     description=(
                         "Library-relative path to start from. "
                         "Example: 'nlp/transformers/attention'."
+                        "Example: '.' for the root library folder."
                     ),
                 ),
                 ToolParameter(
@@ -35,12 +36,12 @@ class ExploreLibraryTool(Tool):
                     description=f"How many levels to expand (default: {default_depth}).",
                     required=False,
                 ),
-                ToolParameter(
-                    name="include_meta",
-                    type="boolean",
-                    description="Whether to include file metadata (default: false).",
-                    required=False,
-                ),
+                # ToolParameter(
+                #     name="include_meta",
+                #     type="boolean",
+                #     description="Whether to include file metadata (default: false).",
+                #     required=False,
+                # ),
             ],
         )
         self._manager = manager
@@ -80,19 +81,9 @@ class ExploreLibraryTool(Tool):
 
         for entry in entries:
             suffix = "/" if entry.is_dir() else ""
-            meta = self._format_meta(entry, include_meta)
-            yield f"{indent}- {entry.name}{suffix}{meta}"
+            yield f"{indent}- {entry.name}{suffix}"
             if entry.is_dir() and depth > 0:
                 yield from self._walk_tree(entry, depth - 1, include_meta, indent + "  ")
 
-    def _format_meta(self, path: Path, include_meta: bool) -> str:
-        if not include_meta or path.is_dir():
-            return ""
-        try:
-            return f" ({path.stat().st_size} bytes)"
-        except OSError:
-            return " (stat failed)"
-
     def _format_file(self, path: Path, include_meta: bool) -> str:
-        suffix = self._format_meta(path, include_meta)
-        return f"- {path.name}{suffix}"
+        return f"- {path.name}"

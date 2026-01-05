@@ -160,11 +160,13 @@ def test_view_file_tool():
     # Test 1: View existing PDF file
     print("\n[1] View existing PDF file:")
     result = executor.execute("view_file", {"file_path": "papers/AI/transformer.pdf"})
+    result.output["text"] = result.output["text"][:100] + "..."  # Truncate for display
     print_result(result)
 
     # Test 2: View existing image file
     print("\n[2] View existing image file:")
     result = executor.execute("view_file", {"file_path": "papers/AI/sample_image.png", "info_type": "content"})
+    result.output["image_url"]["url"] = result.output["image_url"]["url"][:100] + "..."  # Truncate for display
     print_result(result)
 
     # Test 3: View non-existent file

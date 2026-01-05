@@ -38,7 +38,7 @@ class Memory:
 
     def add_raw(self, message: MessageDict):
         if not isinstance(message, dict):
-            raise TypeError("message must be a dict")
+            raise TypeError(f"message must be a dict, got {type(message)}")
         if "role" not in message:
             raise ValueError("message dict must contain a 'role' field")
         self._history.append(message)

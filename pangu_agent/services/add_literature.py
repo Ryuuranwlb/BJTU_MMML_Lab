@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
+from pangu_agent.agent import Agent
 from pangu_agent.library.manager import LibraryManager
 from pangu_agent.llm_client.client import LLMClient
-from pangu_agent.llm_client.memory import Memory
-from pangu_agent.tools.base import ToolExecutor, ToolCall
+from pangu_agent.prompts import (
+    LITERATURE_ORGANIZER_SYSTEM_PROMPT,
+    build_file_organization_prompt,
+)
+from pangu_agent.tools.base import Tool
 
 logger = logging.getLogger(__name__)
 
@@ -20,17 +23,17 @@ class AddLiteratureService:
 
     _manager: LibraryManager
     _llm_client: LLMClient
-    _tool_executor: ToolExecutor
+    _tools: List[Tool]
 
     def __init__(
         self,
         manager: LibraryManager,
         llm_client: LLMClient,
-        tool_executor: ToolExecutor,
+        tools: List[Tool],
     ) -> None:
         self._manager = manager
         self._llm_client = llm_client
-        self._tool_executor = tool_executor
+        self._tools = tools
 
     def scan_addable_files(self, source_path: str) -> List[Path]:
         """Recursively scan for addable files (PDFs and images)."""
@@ -111,98 +114,25 @@ class AddLiteratureService:
     def _ask_llm_to_move_file(
         self, inbox_path: Path, file_content: Dict[str, Any]
     ) -> Dict[str, str] | None:
-        """Use LLM to move the file from inbox to appropriate location."""
-        memory = Memory()
-
-        # System prompt
-        memory.add(
-            "system",
-            "You are a literature library organizer. Your task is to decide the appropriate "
-            "location for a file in the library based on its content. "
-            "You have access to tools to explore the library structure and move files. "
-            "The file is currently in the inbox. Please analyze its content and move it to "
-            "an appropriate location in the library with a meaningful directory structure.",
+        """Use LLM agent to move the file from inbox to appropriate location."""
+        agent = Agent(
+            llm_client=self._llm_client,
+            tools=self._tools,
+            max_iterations=5,
         )
 
-        # Construct user message with file info
-        user_content = self._build_file_context(inbox_path, file_content)
-        memory.add("user", user_content)
+        agent.add_system_prompt(LITERATURE_ORGANIZER_SYSTEM_PROMPT)
+        agent.add_user_message(build_file_organization_prompt(inbox_path, file_content))
 
-        # Get tool schemas
-        tool_schemas = self._tool_executor.schema()
+        def stop_when_file_moved(context: Dict[str, Any]) -> bool:
+            """Stop when move_file tool is successfully executed."""
+            return context["tool_name"] == "move_file" and context["result"].success
 
-        # Call LLM with tools
-        max_iterations = 5
-        for iteration in range(max_iterations):
-            response = self._llm_client.completion(
-                memory, tools=tool_schemas, raw=True
-            )
+        result = agent.run(stop_condition=stop_when_file_moved)
 
-            if response is None:
-                logger.error("LLM returned no response")
-                return None
+        if result["success"] and result.get("result"):
+            dest_path = result["result"]["tool_args"].get("dest_path")
+            return {"destination": dest_path}
 
-            message = response.choices[0].message
-            memory.add_raw(message.model_dump(exclude_unset=True))
-
-            logger.info(f"LLM response (iteration {iteration + 1}): tool_calls={bool(message.tool_calls)}, content={message.content[:100] if message.content else None}")
-
-            # Check if LLM wants to call tools
-            if message.tool_calls:
-                for tool_call in message.tool_calls:
-                    tool_name = tool_call.function.name
-                    tool_args = json.loads(tool_call.function.arguments)
-
-                    logger.info(f"LLM calling tool: {tool_name} with args: {tool_args}")
-
-                    # Execute tool
-                    tc = ToolCall(
-                        name=tool_name, arguments=tool_args, call_id=tool_call.id
-                    )
-                    result = self._tool_executor.execute(tc)
-
-                    # Add tool result to memory
-                    memory.add(
-                        "tool",
-                        content=str(result.output) if result.success else result.error,
-                        tool_call_id=tool_call.id,
-                    )
-
-                    # If move_file was successful, return the destination
-                    if tool_name == "move_file" and result.success:
-                        dest_path = tool_args.get("dest_path")
-                        return {"destination": dest_path}
-
-            elif message.content:
-                # LLM finished without tool calls
-                logger.warning(f"LLM finished without moving file: {message.content}")
-                return None
-
-        logger.error("Max iterations reached without moving file")
+        logger.warning(f"Agent failed to move file: {result}")
         return None
-
-    def _build_file_context(
-        self, inbox_path: Path, file_content: Dict[str, Any]
-    ) -> str:
-        """Build context message about the file for the LLM."""
-        parts: List[str] = []
-        parts.append(f"File in inbox: {inbox_path}")
-
-        file_type = file_content.get("kind")
-        if file_type == "text":
-            text = file_content.get("text", "")
-            preview = text[:2000] if len(text) > 2000 else text
-            parts.append(f"\nFile type: PDF\nContent preview:\n{preview}")
-        elif file_type == "image":
-            parts.append(f"\nFile type: Image")
-
-        metadata = file_content.get("meta_data", {})
-        if metadata:
-            parts.append(f"\nMetadata: {json.dumps(metadata, indent=2)}")
-
-        parts.append(
-            "\n\nPlease explore the library structure and decide where this file should be placed. "
-            "Then use the move_file tool to move it from the inbox to the appropriate location."
-        )
-
-        return "\n".join(parts)

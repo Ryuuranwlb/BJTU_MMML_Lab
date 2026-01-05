@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-
+from typing import Union
 
 @dataclass(frozen=True)
 class LibraryContext:
@@ -16,8 +16,8 @@ class LibraryContext:
         root.mkdir(parents=True, exist_ok=True)
         return cls(root=root)
 
-    def resolve_path(self, path: str) -> Path:
-        candidate = Path(path)
+    def resolve_path(self, path: Union[str, Path]) -> Path:
+        candidate = Path(path) if isinstance(path, Path) else Path(path)
         if not candidate.is_absolute():
             candidate = self.root / candidate
         candidate = candidate.expanduser().resolve()

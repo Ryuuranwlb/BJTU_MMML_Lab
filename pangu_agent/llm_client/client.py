@@ -21,7 +21,7 @@ DEFAULT_CONFIG = Path(__file__).resolve().parent / "configs" / "config.json"
 class LLMClient:
     """Lightweight LLM client wrapper that works directly with Memory."""
 
-    def __init__(self, config: Union[LLMConfig, Dict[str, Any], str] = str(DEFAULT_CONFIG)):
+    def __init__(self, config: Union[LLMConfig, Dict[str, Any], str] = str(DEFAULT_CONFIG), log: bool = True):
         self.config = LLMConfig.from_source(config)
         self.deployment_name: str = self.config.deployment_name
 
@@ -32,6 +32,7 @@ class LLMClient:
         self.config.api_scope = self.config.api_scope or os.getenv("AZURE_API_SCOPE")
 
         self.azure_client: Optional[AzureOpenAI] = None
+        self.log = log
 
         self._init_client()
 
@@ -47,7 +48,7 @@ class LLMClient:
                     api_key=cfg.azure_api_key,
                 )
 
-                if cfg.log:
+                if self.log:
                     logger.info("Initialized AzureOpenAI client with api_key (deployment='%s')", self.deployment_name)
                 return
             except Exception as e:
@@ -69,7 +70,7 @@ class LLMClient:
                     azure_ad_token_provider=token_provider,
                 )
 
-                if cfg.log:
+                if self.log:
                     logger.info("Initialized AzureOpenAI client with AzureCliCredential (deployment='%s')", self.deployment_name)
                 return
             except Exception as e:
@@ -99,7 +100,7 @@ class LLMClient:
                 result = self._call_azure(messages, tools, raw=raw, **kwargs)
 
                 duration = round(time.time() - start, 2)
-                if self.config.log:
+                if self.log:
                     logger.info(
                         "Model '%s' responded in %.2fs (retry=%d)",
                         self.deployment_name,

@@ -24,8 +24,6 @@ class LLMConfig:
     stream: bool = False
     stop: Optional[List[str]] = None
 
-    log: bool = True
-
     def to_dict(self) -> Dict[str, Any]:
         return {
             "deployment_name": self.deployment_name,
@@ -39,7 +37,6 @@ class LLMConfig:
             "top_p": self.top_p,
             "stream": self.stream,
             "stop": self.stop,
-            "log": self.log,
         }
 
     @classmethod
