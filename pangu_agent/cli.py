@@ -38,7 +38,7 @@ DEFAULT_LIBRARY_ROOT = Path(__file__).resolve().parents[1] / "library"
 @click.option(
     "--action",
     required=True,
-    type=click.Choice(["search", "add"], case_sensitive=False),
+    type=click.Choice(["search", "add", "reset"], case_sensitive=False),
     help="Fixed task to execute in run mode.",
 )
 @click.option("--path", help="Path to add (for add).")
@@ -98,6 +98,11 @@ def run(
 
         # Print results
         _print_search_results(result)
+        return
+
+    if action == "reset":
+        # Reset the library by removing all files and metadata
+        _reset_library(library_root)
         return
 
 
@@ -164,6 +169,35 @@ def _print_search_results(result: dict[str, Any]):
 
     if observation:
         click.echo(f"\nObservation:\n  {observation}")
+
+
+def _reset_library(library_root: str):
+    """Reset the library by removing all contents."""
+    # Confirm with user
+    click.echo(f"WARNING: This will delete all contents in: {library_root}")
+    if not click.confirm("Are you sure you want to reset the library?"):
+        click.echo("Reset cancelled.")
+        return
+
+    # Initialize manager and perform reset
+    try:
+        manager = LibraryManager(library_root)
+        result = manager.reset()
+
+        if result["success"]:
+            removed_count = result["removed_count"]
+            message = result.get("message", "")
+
+            if removed_count == 0:
+                click.echo(f"\n{message}")
+            else:
+                click.echo(f"\n✓ Successfully reset library: {library_root}")
+                click.echo(f"  Removed {removed_count} item(s)")
+        else:
+            error = result.get("error", "Unknown error")
+            click.echo(f"\n✗ Failed to reset library: {error}")
+    except Exception as e:
+        click.echo(f"\n✗ Failed to reset library: {e}")
 
 
 

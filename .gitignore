@@ -6,3 +6,4 @@ __pycache__/
 /library/
 /runs/
 /tests/test_data/
+.pytest_cache/

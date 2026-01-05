@@ -427,3 +427,60 @@ class LibraryManager:
             })
 
         return results
+
+    def reset(self) -> Dict[str, Any]:
+        """Reset the library by removing all files and metadata.
+
+        Returns:
+            Dict with success status and count of removed items
+        """
+        if not self._root.exists():
+            return {
+                "success": False,
+                "error": "Library directory does not exist",
+                "removed_count": 0
+            }
+
+        # Count items before deletion
+        total_items = 0
+        for item in self._root.iterdir():
+            total_items += 1
+
+        if total_items == 0:
+            return {
+                "success": True,
+                "removed_count": 0,
+                "message": "Library is already empty"
+            }
+
+        # Delete all contents
+        try:
+            for item in self._root.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item)
+                else:
+                    item.unlink()
+
+            # Reinitialize inbox and vector store
+            self._inbox.mkdir(parents=True, exist_ok=True)
+            self._vector_store = None
+
+            # Reinitialize vector store
+            from pangu_agent.library.embeddings import VectorStore
+            self._vector_store = VectorStore(
+                storage_path=self._root / ".vector_store"
+            )
+
+            logger.info(f"Library reset complete: removed {total_items} items")
+            return {
+                "success": True,
+                "removed_count": total_items,
+                "message": f"Successfully reset library"
+            }
+        except Exception as exc:
+            logger.error(f"Failed to reset library: {exc}")
+            return {
+                "success": False,
+                "error": str(exc),
+                "removed_count": 0
+            }
